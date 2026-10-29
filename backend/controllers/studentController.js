@@ -1,4 +1,5 @@
 const Student = require("../models/Student");
+const bcrypt = require("bcrypt");
 
 // CREATE
 // CREATE
@@ -16,6 +17,35 @@ const createStudent = async (req, res) => {
       });
     }
 
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+const loginStudent = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
+    const student = await Student.findOne({ email }).select("+password");
+
+    if (!student || !(await student.comparePassword(password))) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    res.json({
+      message: "Login successful",
+      student: student.toJSON(),
+    });
+  } catch (error) {
     res.status(500).json({
       message: error.message,
     });
@@ -73,11 +103,16 @@ const getStudentById = async (req, res) => {
 // UPDATE
 const updateStudent = async (req, res) => {
   try {
-    const student = await Student.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
+    const updates = { ...req.body };
+
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 12);
+    }
+
+    const student = await Student.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!student) {
       return res.status(404).json({
@@ -118,6 +153,7 @@ const deleteStudent = async (req, res) => {
 
 module.exports = {
   createStudent,
+  loginStudent,
   getStudents,
   getStudentById,
   updateStudent,

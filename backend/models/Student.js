@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
 
 const studentSchema = new mongoose.Schema(
   {
@@ -33,10 +34,36 @@ const studentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+
+    password: {
+      type: String,
+      required: true,
+      minlength: 8,
+      select: false,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+studentSchema.pre("save", async function () {
+  if (!this.isModified("password")) {
+    return;
+  }
+
+  this.password = await bcrypt.hash(this.password, 12);
+});
+
+studentSchema.methods.comparePassword = function (password) {
+  return bcrypt.compare(password, this.password);
+};
+
+studentSchema.set("toJSON", {
+  transform: (_document, returnedObject) => {
+    delete returnedObject.password;
+    return returnedObject;
+  },
+});
 
 module.exports = mongoose.model("Student", studentSchema);

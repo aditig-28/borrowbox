@@ -2,6 +2,7 @@ const express = require("express");
 
 const {
   createStudent,
+  loginStudent,
   getStudents,
   getStudentById,
   updateStudent,
@@ -11,6 +12,7 @@ const {
 const router = express.Router();
 
 router.post("/", createStudent);
+router.post("/login", loginStudent);
 
 router.get("/", getStudents);
 
