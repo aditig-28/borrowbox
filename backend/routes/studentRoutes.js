@@ -8,6 +8,7 @@ const {
   getStudents,
   getStudentById,
   getCurrentStudent,
+  updateCurrentStudent,
   updateStudent,
   deleteStudent,
 } = require("../controllers/studentController");
@@ -16,6 +17,7 @@ const { authenticateToken, authorizeRoles, requirePurpose } = require("../middle
 const router = express.Router();
 
 router.post("/", createStudent);
+router.post("/register", createStudent);
 router.post("/login", loginStudent);
 router.post("/mfa/setup", authenticateToken, requirePurpose("mfa_setup"), setupMfa);
 router.post("/mfa/enable", authenticateToken, requirePurpose("mfa_setup"), enableMfa);
@@ -23,6 +25,7 @@ router.post("/mfa/enable", authenticateToken, requirePurpose("mfa_setup"), enabl
 router.get("/", authenticateToken, getStudents);
 
 router.get("/me", authenticateToken, getCurrentStudent);
+router.put("/me", authenticateToken, updateCurrentStudent);
 
 router.get("/:id", authenticateToken, getStudentById);
 

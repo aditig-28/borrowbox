@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const Student = require("../models/Student");
 
 const getJwtSecret = () => {
   if (!process.env.JWT_SECRET) {
@@ -7,7 +8,7 @@ const getJwtSecret = () => {
   return process.env.JWT_SECRET;
 };
 
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   const header = req.headers.authorization;
   const token = header && header.startsWith("Bearer ")
     ? header.slice(7)
@@ -20,7 +21,21 @@ const authenticateToken = (req, res, next) => {
   }
 
   try {
-    req.user = jwt.verify(token, getJwtSecret());
+    const decoded = jwt.verify(token, getJwtSecret());
+    req.user = decoded;
+
+    // Refresh live role from DB so role changes reflect immediately
+    if (decoded.id) {
+      try {
+        const student = await Student.findById(decoded.id).select("role");
+        if (student && student.role) {
+          req.user.role = student.role;
+        }
+      } catch (_err) {
+        // fallback to token role
+      }
+    }
+
     return next();
   } catch (_error) {
     return res.status(401).json({

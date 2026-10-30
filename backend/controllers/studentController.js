@@ -19,10 +19,44 @@ const createToken = (student, purpose = "access", expiresIn = "1h") =>
 // CREATE
 const createStudent = async (req, res) => {
   try {
-    const { role: _role, totpSecret: _totpSecret, totpEnabled: _totpEnabled, ...safeDetails } = req.body;
+    const {
+      role: _role,
+      totpSecret: _totpSecret,
+      totpEnabled: _totpEnabled,
+      confirmPassword,
+      ...safeDetails
+    } = req.body;
+
+    const requiredFields = ["studentId", "name", "phone", "email", "department", "year", "password"];
+    const missingFields = requiredFields.filter((field) => !safeDetails[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
+    }
+
+    if (safeDetails.password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters",
+      });
+    }
+
+    if (confirmPassword !== undefined && confirmPassword !== safeDetails.password) {
+      return res.status(400).json({
+        message: "Passwords do not match",
+      });
+    }
+
+    safeDetails.email = safeDetails.email.trim().toLowerCase();
     const student = await Student.create(safeDetails);
 
-    res.status(201).json(student);
+    res.status(201).json({
+      message: "Registration successful. Set up MFA to activate the account.",
+      student: student.toJSON(),
+      setupToken: createToken(student, "mfa_setup", "10m"),
+      requiresMfaSetup: true,
+    });
 
   } catch (error) {
 
@@ -226,6 +260,39 @@ const getCurrentStudent = async (req, res) => {
   }
 };
 
+const updateCurrentStudent = async (req, res) => {
+  try {
+    const {
+      role: _role,
+      totpSecret: _totpSecret,
+      totpEnabled: _totpEnabled,
+      email: _email,
+      studentId: _studentId,
+      ...allowedUpdates
+    } = req.body;
+
+    if (allowedUpdates.password) {
+      if (allowedUpdates.password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+      allowedUpdates.password = await bcrypt.hash(allowedUpdates.password, 12);
+    }
+
+    const student = await Student.findByIdAndUpdate(req.user.id, allowedUpdates, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    return res.json(student);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 // UPDATE
 const updateStudent = async (req, res) => {
   try {
@@ -285,6 +352,7 @@ module.exports = {
   getStudents,
   getStudentById,
   getCurrentStudent,
+  updateCurrentStudent,
   updateStudent,
   deleteStudent,
 };

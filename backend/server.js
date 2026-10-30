@@ -11,8 +11,12 @@ dotenv.config();
 
 connectDB().then(async () => {
   if (process.env.SUPERVISOR_EMAIL) {
-    await Student.updateOne(
-      { email: process.env.SUPERVISOR_EMAIL },
+    const supervisorEmails = process.env.SUPERVISOR_EMAIL.split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    await Student.updateMany(
+      { email: { $in: supervisorEmails } },
       { $set: { role: "supervisor" } }
     );
   }
@@ -32,7 +36,7 @@ app.get("/", (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5053;
 
 app.listen(PORT, () => {
   console.log(`BorrowBox server running on port ${PORT}`);
