@@ -1,11 +1,26 @@
 const Student = require("../models/Student");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const speakeasy = require("speakeasy");
+const QRCode = require("qrcode");
+
+const createToken = (student, purpose = "access", expiresIn = "1h") =>
+  jwt.sign(
+    {
+      id: student._id.toString(),
+      role: student.role,
+      purpose,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn }
+  );
 
 // CREATE
 // CREATE
 const createStudent = async (req, res) => {
   try {
-    const student = await Student.create(req.body);
+    const { role: _role, totpSecret: _totpSecret, totpEnabled: _totpEnabled, ...safeDetails } = req.body;
+    const student = await Student.create(safeDetails);
 
     res.status(201).json(student);
 
@@ -25,7 +40,7 @@ const createStudent = async (req, res) => {
 
 const loginStudent = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, totpCode } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -33,7 +48,7 @@ const loginStudent = async (req, res) => {
       });
     }
 
-    const student = await Student.findOne({ email }).select("+password");
+    const student = await Student.findOne({ email }).select("+password +totpSecret");
 
     if (!student || !(await student.comparePassword(password))) {
       return res.status(401).json({
@@ -41,14 +56,106 @@ const loginStudent = async (req, res) => {
       });
     }
 
+    if (!student.totpEnabled) {
+      return res.json({
+        message: "TOTP enrollment required",
+        requiresMfaSetup: true,
+        setupToken: createToken(student, "mfa_setup", "10m"),
+      });
+    }
+
+    if (!totpCode) {
+      return res.status(400).json({
+        message: "Authenticator code is required",
+      });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: student.totpSecret,
+      encoding: "base32",
+      token: totpCode,
+      window: 1,
+    });
+
+    if (!verified) {
+      return res.status(401).json({
+        message: "Invalid authenticator code",
+      });
+    }
+
     res.json({
       message: "Login successful",
       student: student.toJSON(),
+      token: createToken(student),
     });
   } catch (error) {
     res.status(500).json({
       message: error.message,
     });
+  }
+};
+
+const setupMfa = async (req, res) => {
+  try {
+    const student = await Student.findById(req.user.id).select("+totpSecret");
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    if (!student.totpSecret || student.totpEnabled) {
+      student.totpSecret = speakeasy.generateSecret({
+        name: `BorrowBox (${student.email})`,
+        issuer: "BorrowBox",
+      }).base32;
+      await student.save();
+    }
+
+    const otpauthUrl = speakeasy.otpauthURL({
+      secret: student.totpSecret,
+      encoding: "base32",
+      label: student.email,
+      issuer: "BorrowBox",
+    });
+
+    res.json({
+      secret: student.totpSecret,
+      otpauthUrl,
+      qrCode: await QRCode.toDataURL(otpauthUrl),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const enableMfa = async (req, res) => {
+  try {
+    const { totpCode } = req.body;
+    const student = await Student.findById(req.user.id).select("+totpSecret");
+    if (!student || !student.totpSecret) {
+      return res.status(400).json({ message: "Start MFA setup before enabling it" });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: student.totpSecret,
+      encoding: "base32",
+      token: totpCode,
+      window: 1,
+    });
+
+    if (!verified) {
+      return res.status(401).json({ message: "Invalid authenticator code" });
+    }
+
+    student.totpEnabled = true;
+    await student.save();
+
+    res.json({
+      message: "MFA enabled successfully",
+      student: student.toJSON(),
+      token: createToken(student),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -65,11 +172,9 @@ const loginStudent = async (req, res) => {
 // };
 const getStudents = async (req, res) => {
   try {
-    console.log("GET STUDENTS HIT");
-
-    const students = await Student.find();
-
-    console.log("STUDENTS:", students);
+    const students = req.user.role === "student"
+      ? await Student.find({ _id: req.user.id })
+      : await Student.find();
 
     return res.json(students);
   } catch (error) {
@@ -84,6 +189,15 @@ const getStudents = async (req, res) => {
 // GET ONE
 const getStudentById = async (req, res) => {
   try {
+    if (
+      req.user.role === "student" &&
+      req.params.id !== req.user.id
+    ) {
+      return res.status(403).json({
+        message: "You can only access your own profile",
+      });
+    }
+
     const student = await Student.findById(req.params.id);
 
     if (!student) {
@@ -97,6 +211,18 @@ const getStudentById = async (req, res) => {
     res.status(500).json({
       message: error.message,
     });
+  }
+};
+
+const getCurrentStudent = async (req, res) => {
+  try {
+    const student = await Student.findById(req.user.id);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    return res.json(student);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -154,8 +280,11 @@ const deleteStudent = async (req, res) => {
 module.exports = {
   createStudent,
   loginStudent,
+  setupMfa,
+  enableMfa,
   getStudents,
   getStudentById,
+  getCurrentStudent,
   updateStudent,
   deleteStudent,
 };

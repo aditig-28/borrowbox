@@ -5,10 +5,18 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
+const Student = require("./models/Student");
 
 dotenv.config();
 
-connectDB();
+connectDB().then(async () => {
+  if (process.env.SUPERVISOR_EMAIL) {
+    await Student.updateOne(
+      { email: process.env.SUPERVISOR_EMAIL },
+      { $set: { role: "supervisor" } }
+    );
+  }
+});
 
 const app = express();
 

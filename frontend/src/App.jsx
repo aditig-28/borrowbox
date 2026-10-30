@@ -7,7 +7,8 @@ import BrowseItems from "./pages/BrowseItems";
 import MyListings from "./pages/MyListings";
 import Requests from "./pages/Requests";
 import Profile from "./pages/Profile";
-// import Requests from "./pages/Requests";
+import CreateItem from "./pages/CreateItem";
+import Login from "./pages/Login";
 
 function App() {
   return (
@@ -21,12 +22,10 @@ function App() {
         <Route path="/requests" element={<Requests />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/create-item" element={<CreateItem />} />
-        
-        
+        <Route path="/login" element={<Login />} />
       </Routes>
     </BrowserRouter>
   );
 }
 
 export default App;
-import CreateItem from "./pages/CreateItem";

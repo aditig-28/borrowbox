@@ -11,11 +11,8 @@ function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const res = await API.get("/students");
-
-      if (res.data.length > 0) {
-        setStudent(res.data[0]);
-      }
+      const res = await API.get("/students/me");
+      setStudent(res.data);
     } catch (error) {
       console.error(error);
     }

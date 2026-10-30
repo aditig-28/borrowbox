@@ -10,10 +10,12 @@ const createItem = async (req, res) => {
   }
 };
 
+const ownerSummary = "studentId name department";
+
 // GET ALL
 const getItems = async (req, res) => {
   try {
-    const items = await Item.find().populate("owner");
+    const items = await Item.find().populate("owner", ownerSummary);
 
     res.json(items);
   } catch (error) {
@@ -26,7 +28,7 @@ const getItems = async (req, res) => {
 // GET ONE
 const getItemById = async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id).populate("owner");
+    const item = await Item.findById(req.params.id).populate("owner", ownerSummary);
 
     if (!item) {
       return res.status(404).json({

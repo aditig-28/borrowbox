@@ -41,6 +41,19 @@ const studentSchema = new mongoose.Schema(
       minlength: 8,
       select: false,
     },
+    role: {
+      type: String,
+      enum: ["student", "supervisor", "admin"],
+      default: "student",
+    },
+    totpSecret: {
+      type: String,
+      select: false,
+    },
+    totpEnabled: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -62,6 +75,7 @@ studentSchema.methods.comparePassword = function (password) {
 studentSchema.set("toJSON", {
   transform: (_document, returnedObject) => {
     delete returnedObject.password;
+    delete returnedObject.totpSecret;
     return returnedObject;
   },
 });

@@ -9,11 +9,12 @@ const {
 } = require("../controllers/itemController");
 
 const router = express.Router();
+const { authenticateToken, authorizeRoles } = require("../middleware/auth");
 
 router.post("/", createItem);
 router.get("/", getItems);
 router.get("/:id", getItemById);
-router.put("/:id", updateItem);
-router.delete("/:id", deleteItem);
+router.put("/:id", authenticateToken, authorizeRoles("supervisor", "admin"), updateItem);
+router.delete("/:id", authenticateToken, authorizeRoles("supervisor", "admin"), deleteItem);
 
 module.exports = router;

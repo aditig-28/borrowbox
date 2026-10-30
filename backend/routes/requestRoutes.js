@@ -9,15 +9,14 @@ const {
 } = require("../controllers/requestController");
 
 const router = express.Router();
+const { authenticateToken, authorizeRoles } = require("../middleware/auth");
 
 router.post("/", createRequest);
 
 router.get("/", getRequests);
 
-router.put("/:id/accept", acceptRequest);
-
-router.put("/:id/reject", rejectRequest);
-
-router.put("/:id/return", returnItem);
+router.put("/:id/accept", authenticateToken, authorizeRoles("supervisor", "admin"), acceptRequest);
+router.put("/:id/reject", authenticateToken, authorizeRoles("supervisor", "admin"), rejectRequest);
+router.put("/:id/return", authenticateToken, authorizeRoles("supervisor", "admin"), returnItem);
 
 module.exports = router;
